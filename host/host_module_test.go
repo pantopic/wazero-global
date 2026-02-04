@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -38,10 +39,17 @@ func TestModule(t *testing.T) {
 		t.Fatalf(`%v`, err)
 	}
 
-	ctx = hostModule.ContextCopy(ctx, ctx)
-
 	t.Run(`get`, func(t *testing.T) {
-		_, err := mod.ExportedFunction(`testGet`).Call(ctx, uint64(1))
+		_, err := mod.ExportedFunction(`testGet`).Call(ctx)
+		if err != nil {
+			panic(err.Error())
+		}
+	})
+	t.Run(`override`, func(t *testing.T) {
+		ctx := Override(ctx, `TEST_BOOL`, 0)
+		ctx = Override(ctx, `TEST_UINT64`, 43)
+		ctx = Override(ctx, `TEST_DURATION`, uint64(time.Second))
+		_, err := mod.ExportedFunction(`testOverride`).Call(ctx)
 		if err != nil {
 			panic(err.Error())
 		}

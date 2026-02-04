@@ -13,8 +13,8 @@ import (
 const Name = "pantopic/wazero-global"
 
 var (
-	DefaultCtxKeyMeta    = `__wazero_global_meta`
-	DefaultCtxKeyGlobals = `__wazero_global_map`
+	ctxKeyMeta    = Name + `/meta`
+	ctxKeyGlobals = Name + `/globals`
 )
 
 type meta struct {
@@ -27,18 +27,13 @@ type meta struct {
 type hostModule struct {
 	sync.RWMutex
 
-	module        api.Module
-	ctxKeyMeta    string
-	ctxKeyGlobals string
+	module api.Module
 }
 
 type Option func(*hostModule)
 
 func New(opts ...Option) *hostModule {
-	p := &hostModule{
-		ctxKeyMeta:    DefaultCtxKeyMeta,
-		ctxKeyGlobals: DefaultCtxKeyGlobals,
-	}
+	p := &hostModule{}
 	for _, opt := range opts {
 		opt(p)
 	}
@@ -48,6 +43,7 @@ func New(opts ...Option) *hostModule {
 func (h *hostModule) Name() string {
 	return Name
 }
+
 func (h *hostModule) Stop() {}
 
 // Register instantiates the host module, making it available to all module instances in this runtime
@@ -56,24 +52,16 @@ func (h *hostModule) Register(ctx context.Context, r wazero.Runtime) (err error)
 	register := func(name string, fn func(ctx context.Context, m api.Module, stack []uint64)) {
 		builder = builder.NewFunctionBuilder().WithGoModuleFunction(api.GoModuleFunc(fn), nil, nil).Export(name)
 	}
-	for name, fn := range map[string]any{
-		"__global_set": func(ctx context.Context, globals map[string]uint64, name string, val uint64) {
-			globals[name] = val
-		},
-		"__global_get": func(ctx context.Context, globals map[string]uint64, name string) uint64 {
-			return globals[name]
-		},
-	} {
-		switch fn := fn.(type) {
-		case func(ctx context.Context, globals map[string]uint64, name string, val uint64):
-			register(name, func(ctx context.Context, m api.Module, stack []uint64) {
-				meta := get[*meta](ctx, h.ctxKeyMeta)
-				fn(ctx, h.globals(ctx), string(getName(m, meta)), getVal(m, meta))
-			})
-		default:
-			log.Panicf("Method signature implementation missing: %#v", fn)
+	register("__global_get", func(ctx context.Context, m api.Module, stack []uint64) {
+		meta := get[*meta](ctx, ctxKeyMeta)
+		g := ctx.Value(ctxKeyGlobals)
+		if g == nil {
+			return
 		}
-	}
+		if n, ok := g.(map[string]uint64)[string(getName(m, meta))]; ok {
+			setVal(m, meta, n)
+		}
+	})
 	h.module, err = builder.Instantiate(ctx)
 	return
 }
@@ -94,18 +82,27 @@ func (p *hostModule) InitContext(ctx context.Context, m api.Module) (context.Con
 	} {
 		*v = readUint32(m, ptr+uint32(4*i))
 	}
-	return context.WithValue(ctx, p.ctxKeyMeta, meta), nil
+	return context.WithValue(ctx, ctxKeyMeta, meta), nil
 }
 
 // ContextCopy populates dst context with the meta page from src context.
 func (h *hostModule) ContextCopy(dst, src context.Context) context.Context {
-	dst = context.WithValue(dst, h.ctxKeyMeta, get[*meta](src, h.ctxKeyMeta))
-	dst = context.WithValue(dst, h.ctxKeyGlobals, make(map[string]uint64))
+	dst = context.WithValue(dst, ctxKeyMeta, get[*meta](src, ctxKeyMeta))
 	return dst
 }
 
-func (p *hostModule) globals(ctx context.Context) map[string]uint64 {
-	return get[map[string]uint64](ctx, p.ctxKeyGlobals)
+func globals(ctx context.Context) map[string]uint64 {
+	return get[map[string]uint64](ctx, ctxKeyGlobals)
+}
+
+func Override(ctx context.Context, key string, val uint64) context.Context {
+	o := ctx.Value(ctxKeyGlobals)
+	if o == nil {
+		o = make(map[string]uint64)
+	}
+	overrides := o.(map[string]uint64)
+	overrides[key] = val
+	return context.WithValue(ctx, ctxKeyGlobals, overrides)
 }
 
 func get[T any](ctx context.Context, key string) T {
@@ -128,21 +125,12 @@ func getVal(m api.Module, meta *meta) uint64 {
 	return readUint64(m, meta.ptrVal)
 }
 
-func setVal(m api.Module, meta *meta, i uint64) {
-	writeUint64(m, meta.ptrVal, i)
+func setVal(m api.Module, meta *meta, v uint64) {
+	writeUint64(m, meta.ptrVal, v)
 }
 
 func getName(m api.Module, meta *meta) []byte {
 	return read(m, meta.ptrName, meta.ptrNameLen, meta.ptrNameCap)
-}
-
-func setName(m api.Module, meta *meta, i uint64) {
-	writeUint64(m, meta.ptrName, i)
-}
-
-func setData(m api.Module, meta *meta, b []byte) {
-	copy(read(m, meta.ptrName, uint32(len(b)), meta.ptrNameCap), b)
-	writeUint32(m, meta.ptrNameLen, uint32(len(b)))
 }
 
 func read(m api.Module, ptrData, ptrLen, ptrMax uint32) (buf []byte) {

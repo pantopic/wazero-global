@@ -9,7 +9,7 @@ var (
 	nameCap uint32 = 64
 	nameLen uint32
 	name    = make([]byte, nameCap)
-	meta    = make([]uint32, 2)
+	meta    = make([]uint32, 4)
 )
 
 //export __global
@@ -24,10 +24,6 @@ func __global() (res uint32) {
 	}
 	return uint32(uintptr(unsafe.Pointer(&meta[0])))
 }
-
-//go:wasm-module pantopic/wazero-global
-//export __global_set
-func set()
 
 //go:wasm-module pantopic/wazero-global
 //export __global_get

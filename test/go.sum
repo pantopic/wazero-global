@@ -1,2 +1,2 @@
-github.com/pantopic/wazero-bitset/sdk-go v0.0.2 h1:/ZYsVLO0sag6S3VwWygJB18ZrIsE36IrfAcqs/DUIsg=
-github.com/pantopic/wazero-bitset/sdk-go v0.0.2/go.mod h1:gnKz2Euqa+85C7mPfHBiW2bv1NbTZUZxulRCjidt984=
+github.com/pantopic/wazero-global/sdk-go v0.0.0-20260203160559-989be30e9c6a h1:CgF1JxjbgGj+NQAWzbyLx4EKfZ9zdlvT3Sde+0BIfcY=
+github.com/pantopic/wazero-global/sdk-go v0.0.0-20260203160559-989be30e9c6a/go.mod h1:1ZC9ZxiDCX2V6AdgCS0UNjkpHNzVr5HbYTNHgPqHjTA=

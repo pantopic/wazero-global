@@ -31,5 +31,18 @@ func testGet() {
 	}
 }
 
+//export testOverride
+func testOverride() {
+	if testBool() {
+		panic(`Override bool failed`)
+	}
+	if testUint64() != 43 {
+		panic(`Override uint64 failed`)
+	}
+	if testDuration() != time.Second {
+		panic(`Override duration failed`)
+	}
+}
+
 // Fix for lint rule `unusedfunc`
 var _ = testGet

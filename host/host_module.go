@@ -27,13 +27,17 @@ type meta struct {
 type hostModule struct {
 	sync.RWMutex
 
-	module api.Module
+	module    api.Module
+	mutex     sync.RWMutex
+	overrides map[string]uint64
 }
 
 type Option func(*hostModule)
 
 func New(opts ...Option) *hostModule {
-	p := &hostModule{}
+	p := &hostModule{
+		overrides: make(map[string]uint64),
+	}
 	for _, opt := range opts {
 		opt(p)
 	}
@@ -54,13 +58,13 @@ func (h *hostModule) Register(ctx context.Context, r wazero.Runtime) (err error)
 	}
 	register("__global_get", func(ctx context.Context, m api.Module, stack []uint64) {
 		meta := get[*meta](ctx, ctxKeyMeta)
-		g := ctx.Value(ctxKeyGlobals)
-		if g == nil {
+		h.mutex.RLock()
+		val, ok := h.overrides[string(getName(m, meta))]
+		h.mutex.RUnlock()
+		if !ok {
 			return
 		}
-		if n, ok := g.(map[string]uint64)[string(getName(m, meta))]; ok {
-			setVal(m, meta, n)
-		}
+		setVal(m, meta, val)
 	})
 	h.module, err = builder.Instantiate(ctx)
 	return
@@ -91,18 +95,20 @@ func (h *hostModule) ContextCopy(dst, src context.Context) context.Context {
 	return dst
 }
 
-func globals(ctx context.Context) map[string]uint64 {
-	return get[map[string]uint64](ctx, ctxKeyGlobals)
+func (h *hostModule) Set(key string, val uint64) {
+	h.mutex.Lock()
+	h.overrides[key] = val
+	h.mutex.Unlock()
 }
 
-func Override(ctx context.Context, key string, val uint64) context.Context {
-	o := ctx.Value(ctxKeyGlobals)
-	if o == nil {
-		o = make(map[string]uint64)
-	}
-	overrides := o.(map[string]uint64)
-	overrides[key] = val
-	return context.WithValue(ctx, ctxKeyGlobals, overrides)
+func (h *hostModule) Del(key string) {
+	h.mutex.Lock()
+	delete(h.overrides, key)
+	h.mutex.Unlock()
+}
+
+func globals(ctx context.Context) map[string]uint64 {
+	return get[map[string]uint64](ctx, ctxKeyGlobals)
 }
 
 func get[T any](ctx context.Context, key string) T {

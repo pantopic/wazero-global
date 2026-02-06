@@ -45,11 +45,20 @@ func TestModule(t *testing.T) {
 			panic(err.Error())
 		}
 	})
-	t.Run(`override`, func(t *testing.T) {
-		ctx := Override(ctx, `TEST_BOOL`, 0)
-		ctx = Override(ctx, `TEST_UINT64`, 43)
-		ctx = Override(ctx, `TEST_DURATION`, uint64(time.Second))
+	t.Run(`set`, func(t *testing.T) {
+		hostModule.Set(`TEST_BOOL`, 0)
+		hostModule.Set(`TEST_UINT64`, 43)
+		hostModule.Set(`TEST_DURATION`, uint64(time.Second))
 		_, err := mod.ExportedFunction(`testOverride`).Call(ctx)
+		if err != nil {
+			panic(err.Error())
+		}
+	})
+	t.Run(`del`, func(t *testing.T) {
+		hostModule.Del(`TEST_BOOL`)
+		hostModule.Del(`TEST_UINT64`)
+		hostModule.Del(`TEST_DURATION`)
+		_, err := mod.ExportedFunction(`testGet`).Call(ctx)
 		if err != nil {
 			panic(err.Error())
 		}

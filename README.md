@@ -35,7 +35,7 @@ func main() {
 [![Go Reference](https://godoc.org/github.com/pantopic/wazero-global/sdk-go?status.svg)](https://godoc.org/github.com/pantopic/wazero-global/sdk-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/pantopic/wazero-global/sdk-go)](https://goreportcard.com/report/github.com/pantopic/wazero-global/sdk-go)
 
-Then you can import the guest SDK into your WASI module to send messages from one WASI module to another.
+Then you can import the guest SDK into your WASI module to retrieve globals from the host.
 
 ```go
 package main
@@ -44,24 +44,43 @@ import (
     "github.com/pantopic/wazero-global/sdk-go"
 )
 
-var s *global.Global[uint64]
+var (
+	testBool     global.Bool
+	testUint64   global.Uint64
+	testDuration global.Duration
+)
 
 func main() {
-    s = global.New[uint64]()
+	testBool     = global.NewBool(`TEST_BOOL`, true)
+	testUint64   = global.NewUint64(`TEST_UINT64`, 42)
+	testDuration = global.NewDuration(`TEST_DURATION`, time.Minute)
 }
 
 //export test
 func test() {
-    if !s.Add(123) {
-        print(`123 already global`)
-    }
-    if s.Exists(789) {
-        s.Remove(456)
-    }
+    println(testBool())     // true
+    println(testUint64())   // 42
+    println(testDuration()) // 1m
 }
 ```
 
-This is useful for coordinating operations between receive and send handlers in bidirectional grpc streams.
+The host application can then set and delete globals (as uint64)
+
+```go
+func main() {
+    // ...
+
+    module.Set(`TEST_BOOL`, 0)
+    module.Set(`TEST_UINT64`, 43)
+    module.Set(`TEST_DURATION`, uint64(time.Second))
+    
+    // ...
+    
+    module.Del(`TEST_BOOL`)
+    module.Del(`TEST_UINT64`)
+    module.Del(`TEST_DURATION`)
+}
+```
 
 ## Roadmap
 

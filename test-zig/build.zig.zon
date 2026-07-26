@@ -1,0 +1,14 @@
+.{
+    .name = .wazero_global_test,
+    .version = "0.0.0",
+    .fingerprint = 0x3fb07d03cc9f5dd7,
+    .minimum_zig_version = "0.16.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+    .dependencies = .{
+        .sdk = .{ .path = "../sdk-zig" },
+    },
+}

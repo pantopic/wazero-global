@@ -58,8 +58,9 @@ func (h *hostModule) Register(ctx context.Context, r wazero.Runtime) (err error)
 	}
 	register("__global_get", func(ctx context.Context, m api.Module, stack []uint64) {
 		meta := get[*meta](ctx, ctxKeyMeta)
+		name := string(getName(m, meta))
 		h.mutex.RLock()
-		val, ok := h.overrides[string(getName(m, meta))]
+		val, ok := h.overrides[name]
 		h.mutex.RUnlock()
 		if !ok {
 			return
